@@ -79,6 +79,15 @@
     .final-score small { font-size: 22px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
     .result-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin: 4px 0 25px; }
     .results .next { width: 100%; padding: 14px; margin-top: 12px; }
+    .review { margin: 20px 0; text-align: left; font-size: 14px; line-height: 1.7; overflow-wrap: anywhere; }
+    .review summary { cursor: pointer; color: var(--purple); font-weight: 650; }
+    .review summary:focus-visible { outline: 3px solid #a99aef; outline-offset: 4px; border-radius: 4px; }
+    .review ol { list-style: none; padding: 0; margin: 16px 0 0; }
+    .review li { border-top: 1px solid var(--line); padding: 16px 0; }
+    .review h3 { margin: 0 0 10px; font-size: 16px; line-height: 1.5; }
+    .review p { margin: 8px 0; color: var(--ink); }
+    .review .wrong { color: var(--red); }
+    .review .correct { color: var(--green); }
     @keyframes shake { 20%, 60% { transform: translateX(-5px); } 40%, 80% { transform: translateX(5px); } }
     @keyframes correct-pop { 0% { transform: scale(.96); } 55% { transform: scale(1.025); } 100% { transform: scale(1); } }
     @keyframes appear { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
@@ -125,6 +134,11 @@
         <p id="result-message"></p>
         <div class="final-score" id="final-score"></div>
         <div class="result-label" id="result-label"></div>
+        <details class="review" id="review" hidden>
+          <summary id="review-summary"></summary>
+          <ol id="missed-answers"></ol>
+        </details>
+        <p id="no-missed-answers" hidden>No missed answers. You answered every question correctly!</p>
         <button class="next" id="restart">Explore again <span aria-hidden="true">↻</span></button>
       </div>
     </section>
@@ -147,6 +161,7 @@
     let index = 0;
     let score = 0;
     let answered = false;
+    const selectedAnswers = [];
 
     function renderQuestion(focus = false) {
       answered = false;
@@ -181,6 +196,7 @@
       answered = true;
       const current = questions[index];
       const correct = selected === current.correct;
+      selectedAnswers[index] = selected;
       if (correct) score++;
       [...$("answers").children].forEach((button, position) => {
         button.disabled = true;
@@ -220,6 +236,32 @@
       $("result-message").textContent = reaction[3];
       $("final-score").innerHTML = `${score}<small> / 10</small>`;
       $("result-label").textContent = `${score * 10}% correct · ${score === 10 ? "A perfect mission" : "Curiosity is the real reward"}`;
+      const missed = questions.flatMap((question, position) => {
+        const selected = selectedAnswers[position];
+        if (selected === question.correct) return [];
+        const item = document.createElement("li");
+        const heading = document.createElement("h3");
+        heading.textContent = `Question ${position + 1}: ${question.question}`;
+        item.append(heading);
+        [
+          ["Your answer (incorrect): ", question.answers[selected], "wrong"],
+          ["Correct answer: ", question.answers[question.correct], "correct"],
+          ["Explanation: ", question.fact, ""]
+        ].forEach(([label, text, className]) => {
+          const paragraph = document.createElement("p");
+          paragraph.className = className;
+          const strong = document.createElement("strong");
+          strong.textContent = label;
+          paragraph.append(strong, document.createTextNode(text));
+          item.append(paragraph);
+        });
+        return [item];
+      });
+      $("missed-answers").replaceChildren(...missed);
+      $("review-summary").textContent = `Review missed answers (${missed.length})`;
+      $("review").open = false;
+      $("review").hidden = missed.length === 0;
+      $("no-missed-answers").hidden = missed.length !== 0;
       $("result-title").focus({ preventScroll: true });
     }
 
@@ -231,6 +273,12 @@
     $("restart").addEventListener("click", () => {
       index = 0;
       score = 0;
+      selectedAnswers.length = 0;
+      $("missed-answers").replaceChildren();
+      $("review-summary").textContent = "";
+      $("review").open = false;
+      $("review").hidden = true;
+      $("no-missed-answers").hidden = true;
       $("results").hidden = true;
       $("quiz").hidden = false;
       renderQuestion(true);
